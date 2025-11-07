@@ -23,3 +23,21 @@ env/
 build/
 dist/
 *.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+*.log
+coverage/
+
+# Prisma
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+*.db
+*.db-journal
