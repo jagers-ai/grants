@@ -1,6 +1,6 @@
 // Placeholder ingest script for option B (local only)
 // Later, implement calls to data.go.kr or other sources.
-import axios from 'axios'
+// import axios from 'axios'  // TODO: 공공 API 연동 시 활성화
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()

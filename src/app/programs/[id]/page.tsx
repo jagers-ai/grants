@@ -31,7 +31,7 @@ export default async function ProgramDetail({ params }: Props) {
             <tr><td>마감</td><td>{new Date(program.endDate).toLocaleString()}</td></tr>
           )}
           {program.url && (
-            <tr><td>원문</td><td><a href={program.url} target="_blank">{program.url}</a></td></tr>
+            <tr><td>원문</td><td><a href={program.url} target="_blank" rel="noopener noreferrer">{program.url}</a></td></tr>
           )}
           {typeof program.amountMin === 'number' && (
             <tr><td>금액(최소)</td><td>{program.amountMin.toLocaleString()}만원</td></tr>
