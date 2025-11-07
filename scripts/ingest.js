@@ -1,4 +1,5 @@
 // 공공 API 데이터 수집 스크립트
+import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
 import { fetchKStartupData } from './api/k-startup.js'
 import { fetchBizinfoData } from './api/bizinfo.js'
@@ -11,11 +12,19 @@ async function ingest() {
 
   try {
     // 1. 두 API에서 데이터 수집
-    const kStartupData = await fetchKStartupData()
-    const bizinfoData = await fetchBizinfoData()
+    const kStartupResult = await fetchKStartupData()
+    const bizinfoResult = await fetchBizinfoData()
+
+    // 에러 발생 시 경고 출력
+    if (kStartupResult.error) {
+      console.warn(`⚠️  K-Startup API 에러: ${kStartupResult.message}`)
+    }
+    if (bizinfoResult.error) {
+      console.warn(`⚠️  Bizinfo API 에러: ${bizinfoResult.message}`)
+    }
 
     // 2. 데이터 병합
-    const allData = [...kStartupData, ...bizinfoData]
+    const allData = [...kStartupResult.data, ...bizinfoResult.data]
     console.log(`\n📦 총 수집: ${allData.length}개 항목`)
 
     if (allData.length === 0) {
@@ -41,10 +50,7 @@ async function ingest() {
 
         await prisma.program.upsert({
           where: { sourceId: program.sourceId },
-          update: {
-            ...program,
-            updatedAt: new Date()
-          },
+          update: program,
           create: program
         })
 
@@ -57,7 +63,11 @@ async function ingest() {
       } catch (error) {
         errors++
         console.error(`❌ 저장 실패: ${program.title}`)
+        console.error(`   sourceId: ${program.sourceId}`)
         console.error(`   오류: ${error.message}`)
+        if (error.code) {
+          console.error(`   에러 코드: ${error.code}`)
+        }
       }
     }
 
@@ -90,4 +100,8 @@ async function ingest() {
   }
 }
 
-ingest()
+// Unhandled promise rejection 처리
+ingest().catch((error) => {
+  console.error('❌ Unhandled error in ingest:', error)
+  process.exit(1)
+})

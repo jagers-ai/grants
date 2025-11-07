@@ -6,14 +6,14 @@ const API_KEY = process.env.BIZINFO_API_KEY
 
 /**
  * 기업마당 API에서 지원사업 데이터 가져오기
- * @returns {Promise<Array>} 지원사업 목록
+ * @returns {Promise<{data: Array, error: boolean, message?: string}>} 지원사업 목록 및 에러 정보
  */
 export async function fetchBizinfoData() {
   const programs = []
 
   if (!API_BASE_URL || !API_KEY) {
     console.warn('⚠️  기업마당 API 설정이 없습니다. 환경변수를 확인하세요.')
-    return programs
+    return { data: programs, error: false }
   }
 
   try {
@@ -36,9 +36,16 @@ export async function fetchBizinfoData() {
     console.log(`✅ 기업마당: ${items.length}개 항목 수집`)
 
     for (const item of items) {
+      // sourceId validation: id 또는 policyId가 반드시 있어야 함
+      const id = item.id || item.policyId
+      if (!id) {
+        console.warn(`⚠️  기업마당: ID 없는 항목 스킵 (title: ${item.title || item.policyNm || 'unknown'})`)
+        continue
+      }
+
       programs.push({
         source: 'bizinfo',
-        sourceId: `bizinfo-${item.id || item.policyId}`,
+        sourceId: `bizinfo-${id}`,
         title: item.title || item.policyNm,
         description: item.description || item.policyCn,
         summary: item.summary,
@@ -51,8 +58,8 @@ export async function fetchBizinfoData() {
         endDate: item.endDate ? new Date(item.endDate) : null,
         url: item.url || item.policyUrl,
         status: item.status || 'open',
-        amountMin: item.amountMin ? parseInt(item.amountMin) : null,
-        amountMax: item.amountMax ? parseInt(item.amountMax) : null,
+        amountMin: item.amountMin ? parseInt(item.amountMin, 10) : null,
+        amountMax: item.amountMax ? parseInt(item.amountMax, 10) : null,
       })
     }
 
@@ -62,7 +69,12 @@ export async function fetchBizinfoData() {
       console.error('   응답 상태:', error.response.status)
       console.error('   응답 데이터:', error.response.data)
     }
+    // 에러 발생 시 부분 데이터 반환 명시
+    if (programs.length > 0) {
+      console.warn(`⚠️  기업마당: 에러 발생했지만 ${programs.length}개 항목은 수집됨 (부분 데이터)`)
+    }
+    return { data: programs, error: true, message: error.message }
   }
 
-  return programs
+  return { data: programs, error: false }
 }

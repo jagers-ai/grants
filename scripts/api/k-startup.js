@@ -6,14 +6,14 @@ const API_KEY = process.env.K_STARTUP_API_KEY
 
 /**
  * K-Startup API에서 지원사업 데이터 가져오기
- * @returns {Promise<Array>} 지원사업 목록
+ * @returns {Promise<{data: Array, error: boolean, message?: string}>} 지원사업 목록 및 에러 정보
  */
 export async function fetchKStartupData() {
   const programs = []
 
   if (!API_BASE_URL || !API_KEY) {
     console.warn('⚠️  K-Startup API 설정이 없습니다. 환경변수를 확인하세요.')
-    return programs
+    return { data: programs, error: false }
   }
 
   try {
@@ -36,14 +36,21 @@ export async function fetchKStartupData() {
     console.log(`✅ K-Startup: ${items.length}개 항목 수집`)
 
     for (const item of items) {
+      // sourceId validation: id 또는 bizId가 반드시 있어야 함
+      const id = item.id || item.bizId
+      if (!id) {
+        console.warn(`⚠️  K-Startup: ID 없는 항목 스킵 (title: ${item.title || 'unknown'})`)
+        continue
+      }
+
       programs.push({
         source: 'k-startup',
-        sourceId: `kstartup-${item.id || item.bizId}`,
+        sourceId: `kstartup-${id}`,
         title: item.title || item.bizNm,
         description: item.description || item.bizCn,
         summary: item.summary,
         category: item.category || item.pldirSportRealm,
-        region: item.region || item.region,
+        region: item.region,
         organizer: item.organizer || item.admsDeptNm,
         target: item.target || item.sprtTrgtNm,
         method: item.method,
@@ -51,8 +58,8 @@ export async function fetchKStartupData() {
         endDate: item.endDate ? new Date(item.endDate) : null,
         url: item.url || item.dtlUrl,
         status: item.status || 'open',
-        amountMin: item.amountMin ? parseInt(item.amountMin) : null,
-        amountMax: item.amountMax ? parseInt(item.amountMax) : null,
+        amountMin: item.amountMin ? parseInt(item.amountMin, 10) : null,
+        amountMax: item.amountMax ? parseInt(item.amountMax, 10) : null,
       })
     }
 
@@ -62,7 +69,12 @@ export async function fetchKStartupData() {
       console.error('   응답 상태:', error.response.status)
       console.error('   응답 데이터:', error.response.data)
     }
+    // 에러 발생 시 부분 데이터 반환 명시
+    if (programs.length > 0) {
+      console.warn(`⚠️  K-Startup: 에러 발생했지만 ${programs.length}개 항목은 수집됨 (부분 데이터)`)
+    }
+    return { data: programs, error: true, message: error.message }
   }
 
-  return programs
+  return { data: programs, error: false }
 }
