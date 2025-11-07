@@ -30,44 +30,73 @@ export async function fetchBizinfoData() {
       timeout: 30000,
     })
 
-    // 응답 구조: { list: [], totCnt: number } 또는 { bizinfo: { list: [] } }
-    const items = response.data.list || response.data.bizinfo?.list || []
+    // 응답 구조: { jsonArray: [...] }
+    const items = response.data.jsonArray || response.data.list || response.data.bizinfo?.list || []
 
     console.log(`✅ 기업마당: ${items.length}개 항목 수집`)
 
     for (const item of items) {
       // sourceId validation: pblancId가 반드시 있어야 함
       const id = item.pblancId
-      if (!id) {
-        console.warn(`⚠️  기업마당: ID 없는 항목 스킵 (title: ${item.title || 'unknown'})`)
+      const title = item.pblancNm
+
+      if (!id || !title) {
+        console.warn(`⚠️  기업마당: ID/제목 없는 항목 스킵 (id: ${id}, title: ${title})`)
         continue
       }
 
-      // pubDate 파싱 (다양한 형식 대응: "Wed, 08 Jan 2025 12:00:00 +0900" 등)
-      let pubDate = null
-      if (item.pubDate) {
-        try {
-          pubDate = new Date(item.pubDate)
-        } catch (e) {
-          console.warn(`⚠️  날짜 파싱 실패: ${item.pubDate}`)
+      // reqstBeginEndDe 파싱 (예: "20251112 ~ 20251127" 또는 "예산 소진시까지")
+      let startDate = null
+      let endDate = null
+      let status = 'open'
+
+      if (item.reqstBeginEndDe && item.reqstBeginEndDe.includes('~')) {
+        const dates = item.reqstBeginEndDe.split('~').map(d => d.trim())
+
+        // YYYYMMDD 형식을 YYYY-MM-DD로 변환하는 헬퍼 함수
+        const parseDate = (dateStr) => {
+          const cleaned = dateStr.replace(/\s/g, '') // 공백 제거
+          if (/^\d{8}$/.test(cleaned)) {
+            // YYYYMMDD 형식
+            const year = cleaned.substring(0, 4)
+            const month = cleaned.substring(4, 6)
+            const day = cleaned.substring(6, 8)
+            return new Date(`${year}-${month}-${day}`)
+          }
+          return null
+        }
+
+        if (dates[0]) {
+          startDate = parseDate(dates[0])
+        }
+        if (dates[1]) {
+          endDate = parseDate(dates[1])
+          if (endDate) {
+            status = endDate > new Date() ? 'open' : 'closed'
+          }
         }
       }
+
+      // URL 생성 (상대 경로를 절대 경로로)
+      const url = item.pblancUrl
+        ? `https://www.bizinfo.go.kr${item.pblancUrl}`
+        : item.rceptEngnHmpgUrl || null
 
       programs.push({
         source: 'bizinfo',
         sourceId: `bizinfo-${id}`,
-        title: item.title,
-        description: item.description || null,
+        title: title,
+        description: item.bsnsSumryCn || null,
         summary: null,
-        category: item.hashtags || null,
+        category: item.pldirSportRealmLclasCodeNm || item.hashtags || null,
         region: null, // API에서 제공하지 않음
-        organizer: item.author || null,
-        target: null, // API에서 제공하지 않음
+        organizer: item.jrsdInsttNm || item.excInsttNm || null,
+        target: item.trgetNm || null,
         method: null,
-        startDate: pubDate, // 등록일을 시작일로 사용
-        endDate: null, // API에서 제공하지 않음
-        url: item.link || null,
-        status: 'open', // 기본값 (종료일 정보 없음)
+        startDate: startDate,
+        endDate: endDate,
+        url: url,
+        status: status,
         amountMin: null,
         amountMax: null,
       })
