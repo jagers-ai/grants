@@ -19,47 +19,61 @@ export async function fetchKStartupData() {
   try {
     console.log('📡 K-Startup API 호출 중...')
 
-    // TODO: 실제 API 엔드포인트 및 파라미터 설정
-    const response = await axios.get(API_BASE_URL, {
+    // K-Startup API: 지원사업 공고 정보 조회
+    const response = await axios.get(`${API_BASE_URL}/getAnnouncementInformation01`, {
       params: {
         serviceKey: API_KEY,
-        pageNo: 1,
-        numOfRows: 100,
-        // 기타 필수 파라미터 추가
+        page: 1,
+        perPage: 100,
+        returnType: 'json', // 기본값이 xml이므로 json 명시
       },
       timeout: 30000,
     })
 
-    // TODO: 응답 형식에 따라 파싱 (XML/JSON)
-    const items = response.data.items || response.data.response?.body?.items || []
+    // 응답 구조: { currentCount, matchCount, page, perPage, totalCount, data: [] }
+    const items = response.data.data || []
 
     console.log(`✅ K-Startup: ${items.length}개 항목 수집`)
 
     for (const item of items) {
-      // sourceId validation: id 또는 bizId가 반드시 있어야 함
-      const id = item.id || item.bizId
-      if (!id) {
-        console.warn(`⚠️  K-Startup: ID 없는 항목 스킵 (title: ${item.title || 'unknown'})`)
+      // sourceId validation: 제목과 날짜가 반드시 있어야 함
+      const title = item.biz_pbanc_nm
+      const startDate = item.pbanc_rcpt_bgng_dt
+
+      if (!title || !startDate) {
+        console.warn(`⚠️  K-Startup: 필수 정보 없는 항목 스킵 (title: ${title || 'unknown'})`)
         continue
+      }
+
+      // 고유 ID 생성: 제목 일부 + 날짜
+      const titleSlug = title.replace(/[^a-zA-Z0-9가-힣]/g, '').slice(0, 30)
+      const id = `${titleSlug}-${startDate}`
+
+      // 상태 판단: 종료일이 오늘보다 미래면 'open', 과거면 'closed'
+      const endDate = item.pbanc_rcpt_end_dt
+      let status = 'open'
+      if (endDate) {
+        const endDateTime = new Date(endDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'))
+        status = endDateTime > new Date() ? 'open' : 'closed'
       }
 
       programs.push({
         source: 'k-startup',
         sourceId: `kstartup-${id}`,
-        title: item.title || item.bizNm,
-        description: item.description || item.bizCn,
-        summary: item.summary,
-        category: item.category || item.pldirSportRealm,
-        region: item.region,
-        organizer: item.organizer || item.admsDeptNm,
-        target: item.target || item.sprtTrgtNm,
-        method: item.method,
-        startDate: item.startDate ? new Date(item.startDate) : null,
-        endDate: item.endDate ? new Date(item.endDate) : null,
-        url: item.url || item.dtlUrl,
-        status: item.status || 'open',
-        amountMin: item.amountMin ? parseInt(item.amountMin, 10) : null,
-        amountMax: item.amountMax ? parseInt(item.amountMax, 10) : null,
+        title: title,
+        description: null, // API에서 제공하지 않음
+        summary: null,
+        category: item.supt_biz_clsfc || null,
+        region: null, // API에서 제공하지 않음
+        organizer: item.pbanc_ntrp_nm || null,
+        target: item.aply_trgt || null,
+        method: null,
+        startDate: startDate ? new Date(startDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')) : null,
+        endDate: endDate ? new Date(endDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')) : null,
+        url: null, // API에서 제공하지 않음
+        status: status,
+        amountMin: null,
+        amountMax: null,
       })
     }
 

@@ -19,47 +19,57 @@ export async function fetchBizinfoData() {
   try {
     console.log('📡 기업마당 API 호출 중...')
 
-    // TODO: 실제 API 엔드포인트 및 파라미터 설정
+    // 기업마당 API: 지원사업 정보 조회 (주의: crtfcKey 사용!)
     const response = await axios.get(API_BASE_URL, {
       params: {
-        serviceKey: API_KEY,
-        pageNo: 1,
-        numOfRows: 100,
-        // 기타 필수 파라미터 추가
+        crtfcKey: API_KEY,  // serviceKey가 아닌 crtfcKey 사용!
+        dataType: 'json',   // JSON 형식 요청
+        pageIndex: 1,
+        pageUnit: 100,
       },
       timeout: 30000,
     })
 
-    // TODO: 응답 형식에 따라 파싱 (XML/JSON)
-    const items = response.data.items || response.data.response?.body?.items || []
+    // 응답 구조: { list: [], totCnt: number } 또는 { bizinfo: { list: [] } }
+    const items = response.data.list || response.data.bizinfo?.list || []
 
     console.log(`✅ 기업마당: ${items.length}개 항목 수집`)
 
     for (const item of items) {
-      // sourceId validation: id 또는 policyId가 반드시 있어야 함
-      const id = item.id || item.policyId
+      // sourceId validation: pblancId가 반드시 있어야 함
+      const id = item.pblancId
       if (!id) {
-        console.warn(`⚠️  기업마당: ID 없는 항목 스킵 (title: ${item.title || item.policyNm || 'unknown'})`)
+        console.warn(`⚠️  기업마당: ID 없는 항목 스킵 (title: ${item.title || 'unknown'})`)
         continue
+      }
+
+      // pubDate 파싱 (다양한 형식 대응: "Wed, 08 Jan 2025 12:00:00 +0900" 등)
+      let pubDate = null
+      if (item.pubDate) {
+        try {
+          pubDate = new Date(item.pubDate)
+        } catch (e) {
+          console.warn(`⚠️  날짜 파싱 실패: ${item.pubDate}`)
+        }
       }
 
       programs.push({
         source: 'bizinfo',
         sourceId: `bizinfo-${id}`,
-        title: item.title || item.policyNm,
-        description: item.description || item.policyCn,
-        summary: item.summary,
-        category: item.category || item.policyFld,
-        region: item.region || item.policyRgn,
-        organizer: item.organizer || item.inqrCtgryNm,
-        target: item.target || item.sprtTrgtNm,
-        method: item.method,
-        startDate: item.startDate ? new Date(item.startDate) : null,
-        endDate: item.endDate ? new Date(item.endDate) : null,
-        url: item.url || item.policyUrl,
-        status: item.status || 'open',
-        amountMin: item.amountMin ? parseInt(item.amountMin, 10) : null,
-        amountMax: item.amountMax ? parseInt(item.amountMax, 10) : null,
+        title: item.title,
+        description: item.description || null,
+        summary: null,
+        category: item.hashtags || null,
+        region: null, // API에서 제공하지 않음
+        organizer: item.author || null,
+        target: null, // API에서 제공하지 않음
+        method: null,
+        startDate: pubDate, // 등록일을 시작일로 사용
+        endDate: null, // API에서 제공하지 않음
+        url: item.link || null,
+        status: 'open', // 기본값 (종료일 정보 없음)
+        amountMin: null,
+        amountMax: null,
       })
     }
 
