@@ -27,10 +27,14 @@ export function deduplicatePrograms(programs) {
       continue
     }
 
-    // 제목 + 주관기관으로 중복 체크
+    // 제목 + 주관기관 + 시작일로 중복 체크
+    // (같은 사업이 매년 반복되는 경우를 구분하기 위해 날짜 포함)
     const normalizedTitle = normalizeString(program.title)
     const normalizedOrganizer = normalizeString(program.organizer)
-    const key = `${normalizedTitle}|${normalizedOrganizer}`
+    const dateKey = program.startDate
+      ? new Date(program.startDate).toISOString().substring(0, 10)  // YYYY-MM-DD
+      : 'no-date'
+    const key = `${normalizedTitle}|${normalizedOrganizer}|${dateKey}`
 
     if (!seen.has(key)) {
       seen.set(program.sourceId, true)
