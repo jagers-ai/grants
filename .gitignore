@@ -23,6 +23,7 @@ env/
 build/
 dist/
 *.egg-info/
+tsconfig.tsbuildinfo
 
 # Node / Next.js
 node_modules/

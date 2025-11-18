@@ -15,7 +15,7 @@ export type SummarySections = {
  * 현재: 첫 2개 문장 추출
  * TODO: AI 요약으로 전환 고려
  */
-export function summarize(description?: string): string | undefined {
+export function summarize(description?: string | null): string | undefined {
   if (!description) return undefined
 
   // 공백 정규화 및 문장 분리
@@ -30,4 +30,3 @@ export function summarize(description?: string): string | undefined {
   // 첫 2문장 추출, 3개 이상일 때만 마침표 추가 (truncation 표시)
   return sents.slice(0, 2).join('. ') + (sents.length > 2 ? '.' : '')
 }
-
