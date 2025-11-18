@@ -38,6 +38,18 @@ npm run dev
 # http://localhost:3000
 ```
 
+### (선택) grants alias로 실행
+
+매번 디렉터리로 이동하지 않고 바로 개발 서버를 띄우고 싶다면, 쉘 설정 파일(`~/.bashrc`, `~/.zshrc` 등)에 아래와 같이 alias를 추가해서 사용할 수 있습니다.
+
+```bash
+# 예시: 로컬 grants 프로젝트를 한 번에 실행
+alias grants='(cd ~/projects/grents && npm run dev)'
+
+# 이후에는 터미널에서 다음과 같이 실행
+# $ grants
+```
+
 ## 스키마 모델
 
 - Program: 기본 지원사업 엔티티(제목/요약/기간/링크/주관/금액 등)
@@ -54,4 +66,3 @@ npm run dev
 
 - `scripts/ingest.js`는 더미 데이터를 추가하는 자리표시자입니다.
 - 실제 연동 시 data.go.kr API 키를 `.env`의 `DATA_GO_KR_API_KEY`에 설정 후 구현하세요.
-
