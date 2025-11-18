@@ -33,5 +33,5 @@ model Program {
   @@index([category], name: "idx_category")
   @@index([region], name: "idx_region")
   @@index([status], name: "idx_status")
+  @@index([source], name: "idx_source")
 }
-

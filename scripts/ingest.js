@@ -1,11 +1,32 @@
 // 공공 API 데이터 수집 스크립트
 import 'dotenv/config'
 import { PrismaClient } from '@prisma/client'
+import { z } from 'zod'
 import { fetchKStartupData } from './api/k-startup.js'
 import { fetchBizinfoData } from './api/bizinfo.js'
 import { deduplicatePrograms } from './utils/deduplicator.js'
 
 const prisma = new PrismaClient()
+
+// 최소 형태 검증용 스키마 (ingest 안전장치)
+const ProgramInputSchema = z.object({
+  source: z.string().nullable().optional(),
+  sourceId: z.string().min(1),
+  title: z.string().min(1),
+  summary: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  category: z.string().nullable().optional(),
+  region: z.string().nullable().optional(),
+  target: z.string().nullable().optional(),
+  method: z.string().nullable().optional(),
+  amountMin: z.number().int().nullable().optional(),
+  amountMax: z.number().int().nullable().optional(),
+  startDate: z.date().nullable().optional(),
+  endDate: z.date().nullable().optional(),
+  status: z.string().nullable().optional(),
+  url: z.string().nullable().optional(),
+  organizer: z.string().nullable().optional()
+})
 
 async function ingest() {
   console.log('🚀 [ingest] 데이터 수집 시작...\n')
@@ -35,14 +56,34 @@ async function ingest() {
 
     // 3. 중복 제거
     const uniquePrograms = deduplicatePrograms(allData)
-    console.log(`\n💾 DB 저장 시작...`)
+    console.log(`\n🧹 중복 제거 후: ${uniquePrograms.length}개`)
+
+    // 3-1. 최소 스키마 검증
+    const validPrograms = []
+    let skippedForValidation = 0
+
+    for (const program of uniquePrograms) {
+      const result = ProgramInputSchema.safeParse(program)
+      if (!result.success) {
+        skippedForValidation++
+        console.warn('⚠️  유효하지 않은 프로그램 항목 스킵:', {
+          title: program.title,
+          sourceId: program.sourceId,
+          issues: result.error.issues.map((i) => i.message)
+        })
+        continue
+      }
+      validPrograms.push(result.data)
+    }
+
+    console.log(`\n💾 DB 저장 시작... (유효 항목: ${validPrograms.length}개, 검증 실패: ${skippedForValidation}개)`)
 
     // 4. DB에 저장 (upsert로 중복 방지)
     let created = 0
     let updated = 0
     let errors = 0
 
-    for (const program of uniquePrograms) {
+    for (const program of validPrograms) {
       try {
         const existing = await prisma.program.findUnique({
           where: { sourceId: program.sourceId }
@@ -59,7 +100,6 @@ async function ingest() {
         } else {
           created++
         }
-
       } catch (error) {
         errors++
         console.error(`❌ 저장 실패: ${program.title}`)
@@ -85,11 +125,18 @@ async function ingest() {
       by: ['source'],
       _count: true
     })
+    const byStatus = await prisma.program.groupBy({
+      by: ['status'],
+      _count: true
+    })
 
     console.log(`\n📊 전체 통계:`)
     console.log(`   - 총 사업 수: ${totalCount}개`)
     bySource.forEach(item => {
-      console.log(`   - ${item.source}: ${item._count}개`)
+      console.log(`   - 출처 ${item.source ?? 'unknown'}: ${item._count}개`)
+    })
+    byStatus.forEach(item => {
+      console.log(`   - 상태 ${item.status ?? 'unknown'}: ${item._count}개`)
     })
 
   } catch (error) {
