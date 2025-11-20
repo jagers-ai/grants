@@ -44,7 +44,10 @@ npm run dev
 
 ```bash
 # 예시: 로컬 grants 프로젝트를 한 번에 실행
-alias grants='(cd ~/projects/grants && npm run dev)'
+alias grants='~/projects/grants/scripts/grants.sh'
+
+# grants는 dev 서버를 띄우고 http://localhost:3000 을 브라우저에서 엽니다.
+# 로그는 /tmp/grants-dev.log 에 남습니다.
 
 # 이후에는 터미널에서 다음과 같이 실행
 # $ grants
