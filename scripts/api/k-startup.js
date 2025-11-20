@@ -1,10 +1,8 @@
 // K-Startup API (창업넷) 클라이언트
 import axios from 'axios'
-import * as cheerio from 'cheerio'
 
 const API_BASE_URL = process.env.K_STARTUP_API_URL
 const API_KEY = process.env.K_STARTUP_API_KEY
-const KSTARTUP_LIST_CATEGORIES = ['PBC010', 'PBC020'] // 모집중/마감임박 분류
 
 /**
  * K-Startup API에서 지원사업 데이터 가져오기
@@ -20,9 +18,6 @@ export async function fetchKStartupData() {
 
   try {
     console.log('📡 K-Startup API 호출 중...')
-
-    // 웹 목록에서 조회수 수집 (카테고리별 몇 페이지만 탐색)
-    const viewCountMap = await fetchKStartupViewCounts()
 
     // K-Startup API: 지원사업 공고 정보 조회
     const response = await axios.get(`${API_BASE_URL}/getAnnouncementInformation01`, {
@@ -50,13 +45,9 @@ export async function fetchKStartupData() {
         continue
       }
 
-      const pbancSn = item.pbanc_sn ?? item.pbancSn ?? null
-      const pbancKey = pbancSn ? String(pbancSn) : null
-
-      // 고유 ID: 가능하면 pbancSn 사용
+      // 고유 ID 생성: 제목 일부 + 날짜
       const titleSlug = title.replace(/[^a-zA-Z0-9가-힣]/g, '').slice(0, 30)
-      const fallbackId = `${titleSlug}-${startDate}`
-      const sourceId = pbancKey ? `kstartup-${pbancKey}` : `kstartup-${fallbackId}`
+      const id = `${titleSlug}-${startDate}`
 
       // 상태 판단: 종료일이 오늘보다 미래면 'open', 과거면 'closed'
       const endDate = item.pbanc_rcpt_end_dt
@@ -66,11 +57,9 @@ export async function fetchKStartupData() {
         status = endDateTime > new Date() ? 'open' : 'closed'
       }
 
-      const viewCount = pbancKey ? (viewCountMap.get(pbancKey) ?? null) : null
-
       programs.push({
         source: 'k-startup',
-        sourceId,
+        sourceId: `kstartup-${id}`,
         title: title,
         description: null, // API에서 제공하지 않음
         summary: null,
@@ -81,11 +70,10 @@ export async function fetchKStartupData() {
         method: null,
         startDate: startDate ? new Date(startDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')) : null,
         endDate: endDate ? new Date(endDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')) : null,
-        url: item.detl_pg_url || null,
+        url: null, // API에서 제공하지 않음
         status: status,
         amountMin: null,
         amountMax: null,
-        viewCount,
       })
     }
 
@@ -103,36 +91,4 @@ export async function fetchKStartupData() {
   }
 
   return { data: programs, error: false }
-}
-
-async function fetchKStartupViewCounts(pages = 2) {
-  const viewMap = new Map()
-
-  for (const category of KSTARTUP_LIST_CATEGORIES) {
-    for (let page = 1; page <= pages; page++) {
-      const url = `https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?page=${page}&pbancClssCd=${category}`
-      try {
-        const res = await axios.get(url, {
-          timeout: 20000,
-          headers: { 'User-Agent': 'Mozilla/5.0' },
-        })
-
-        const body = String(res.data)
-        // go_view(12345) ... 조회 1,234 패턴을 전역 검색
-        const regex = /go_view\((\d+)\)[\s\S]*?조회\s*([0-9,]+)/g
-        let match
-        while ((match = regex.exec(body)) !== null) {
-          const id = match[1]
-          const view = Number(match[2].replace(/,/g, ''))
-          if (Number.isFinite(view) && !viewMap.has(id)) {
-            viewMap.set(id, view)
-          }
-        }
-      } catch (error) {
-        console.warn(`⚠️  K-Startup viewCount 수집 실패 (category=${category}, page=${page}): ${error.message}`)
-      }
-    }
-  }
-
-  return viewMap
 }
