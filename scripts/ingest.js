@@ -25,7 +25,8 @@ const ProgramInputSchema = z.object({
   endDate: z.date().nullable().optional(),
   status: z.string().nullable().optional(),
   url: z.string().nullable().optional(),
-  organizer: z.string().nullable().optional()
+  organizer: z.string().nullable().optional(),
+  viewCount: z.number().int().nullable().optional()
 })
 
 async function ingest() {
