@@ -43,7 +43,12 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   const programs = await prisma.program.findMany({
     where,
-    orderBy: [{ viewCount: 'desc' }, { endDate: 'asc' }, { createdAt: 'desc' }],
+    orderBy: [
+      // 조회수 내림차순, 없는 값(null)은 최하단으로 보장
+      { viewCount: { sort: 'desc', nulls: 'last' } as any },
+      { endDate: 'asc' },
+      { createdAt: 'desc' },
+    ],
     take: 50,
   })
 
