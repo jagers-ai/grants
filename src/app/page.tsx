@@ -41,11 +41,25 @@ export default async function HomePage({ searchParams }: PageProps) {
     where.source = { in: sources }
   }
 
-  const programs = await prisma.program.findMany({
+  const rawPrograms = await prisma.program.findMany({
     where,
-    orderBy: [{ endDate: 'asc' }, { createdAt: 'desc' }],
-    take: 50,
   })
+
+  const programs = rawPrograms
+    .sort((a, b) => {
+      const aViews = a.viewCount ?? 0
+      const bViews = b.viewCount ?? 0
+      if (bViews !== aViews) return bViews - aViews
+
+      const aEnd = a.endDate ? new Date(a.endDate).getTime() : Number.POSITIVE_INFINITY
+      const bEnd = b.endDate ? new Date(b.endDate).getTime() : Number.POSITIVE_INFINITY
+      if (aEnd !== bEnd) return aEnd - bEnd
+
+      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return bCreated - aCreated
+    })
+    .slice(0, 50)
 
   // 필터 통계 (UI 표시용)
   const totalCount = await prisma.program.count({ where })

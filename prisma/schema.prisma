@@ -23,6 +23,7 @@ model Program {
   startDate    DateTime?
   endDate      DateTime?
   status       String?   @default("open")
+  viewCount    Int?
   url          String?
   organizer    String?
   createdAt    DateTime  @default(now())
