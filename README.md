@@ -44,7 +44,7 @@ npm run dev
 
 ```bash
 # 예시: 로컬 grants 프로젝트를 한 번에 실행
-alias grants='(cd ~/projects/grents && npm run dev)'
+alias grants='(cd ~/projects/grants && npm run dev)'
 
 # 이후에는 터미널에서 다음과 같이 실행
 # $ grants
