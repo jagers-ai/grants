@@ -19,10 +19,45 @@ port_in_use() {
   return 1
 }
 
+pid_on_port() {
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -ti :3000 -sTCP:LISTEN 2>/dev/null | head -n 1
+    return
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | awk '/:3000 /{print $NF}' | sed -E 's/.*pid=([0-9]+).*/\1/' | head -n 1
+    return
+  fi
+}
+
+wait_for_ready() {
+  for _ in $(seq 1 10); do
+    if curl -fsS --max-time 2 "$URL" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 start_dev() {
   if port_in_use; then
-    echo "포트 3000이 이미 사용 중입니다. dev 서버가 떠 있을 수 있어요."
-    return 0
+    local pid
+    pid="$(pid_on_port || true)"
+
+    if wait_for_ready; then
+      echo "포트 3000(pid=${pid:-?})에서 이미 서버가 응답 중입니다. 브라우저만 엽니다."
+      return 0
+    fi
+
+    if [ -n "$pid" ]; then
+      echo "포트 3000 프로세스(pid=$pid)가 응답하지 않습니다. 종료 후 재시작합니다."
+      kill "$pid" 2>/dev/null || true
+      sleep 1
+    else
+      echo "포트 3000이 점유 중인데 PID를 찾지 못했습니다. 재시작을 시도합니다."
+    fi
   fi
 
   (
@@ -30,7 +65,11 @@ start_dev() {
     npm run dev >"$LOG_FILE" 2>&1 &
   )
 
-  echo "grants dev 서버를 시작했습니다. 로그: $LOG_FILE"
+  if wait_for_ready; then
+    echo "grants dev 서버를 시작했습니다. 로그: $LOG_FILE"
+  else
+    echo "dev 서버 응답을 확인하지 못했습니다. 로그를 확인하세요: $LOG_FILE"
+  fi
 }
 
 open_url() {
