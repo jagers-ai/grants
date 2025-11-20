@@ -49,6 +49,12 @@ export async function fetchBizinfoData() {
       let startDate = null
       let endDate = null
       let status = 'open'
+      const viewCount = (() => {
+        const raw = item.inqireCo ?? item.inqCnt ?? null
+        if (raw === null || raw === undefined) return null
+        const num = Number(raw)
+        return Number.isFinite(num) ? num : null
+      })()
 
       if (item.reqstBeginEndDe && item.reqstBeginEndDe.includes('~')) {
         const dates = item.reqstBeginEndDe.split('~').map(d => d.trim())
@@ -99,6 +105,7 @@ export async function fetchBizinfoData() {
         status: status,
         amountMin: null,
         amountMax: null,
+        viewCount: viewCount,
       })
     }
 
