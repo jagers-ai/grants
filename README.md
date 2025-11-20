@@ -44,7 +44,12 @@ npm run dev
 
 ```bash
 # 예시: 로컬 grants 프로젝트를 한 번에 실행
-alias grants='(cd ~/projects/grents && npm run dev)'
+alias grants='~/projects/grants/scripts/grants.sh'
+
+# grants는 dev 서버를 띄우고 http://localhost:3000 을 브라우저에서 엽니다.
+# 포트 3000이 점유 중이면 응답 여부를 확인하고, 동일 프로젝트/next 프로세스일 때만 재시작합니다.
+# 다른 서비스가 3000을 쓰는 경우 강제 종료하지 않습니다. 포트를 바꾸려면 GRANTS_DEV_PORT, GRANTS_DEV_URL을 설정하세요.
+# 로그는 /tmp/grants-dev.log 에 남습니다.
 
 # 이후에는 터미널에서 다음과 같이 실행
 # $ grants
