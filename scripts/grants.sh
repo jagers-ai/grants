@@ -5,14 +5,26 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG_FILE="${GRANTS_DEV_LOG:-/tmp/grants-dev.log}"
 URL="${GRANTS_DEV_URL:-http://localhost:3000}"
 
+if ! command -v curl >/dev/null 2>&1; then
+  echo "curl 이 필요합니다. 설치 후 다시 실행하세요."
+  exit 1
+fi
+
+# 포트는 GRANTS_DEV_PORT가 우선, 없으면 URL에서 추출, 그래도 없으면 3000
+PORT="${GRANTS_DEV_PORT:-}"
+if [[ -z "$PORT" && "$URL" =~ :([0-9]+) ]]; then
+  PORT="${BASH_REMATCH[1]}"
+fi
+PORT="${PORT:-3000}"
+
 port_in_use() {
   if command -v ss >/dev/null 2>&1; then
-    ss -tln | awk '{print $4}' | grep -q ":3000\$"
+    ss -tln | awk '{print $4}' | grep -q ":${PORT}\$"
     return
   fi
 
   if command -v lsof >/dev/null 2>&1; then
-    lsof -i :3000 -sTCP:LISTEN >/dev/null 2>&1
+    lsof -i :"$PORT" -sTCP:LISTEN >/dev/null 2>&1
     return
   fi
 
@@ -21,12 +33,12 @@ port_in_use() {
 
 pid_on_port() {
   if command -v lsof >/dev/null 2>&1; then
-    lsof -ti :3000 -sTCP:LISTEN 2>/dev/null | head -n 1
+    lsof -ti :"$PORT" -sTCP:LISTEN 2>/dev/null | head -n 1
     return
   fi
 
   if command -v ss >/dev/null 2>&1; then
-    ss -tlnp 2>/dev/null | awk '/:3000 /{print $NF}' | sed -E 's/.*pid=([0-9]+).*/\1/' | head -n 1
+    ss -tlnp 2>/dev/null | awk '/:'"$PORT"' /{print $NF}' | sed -E 's/.*pid=([0-9]+).*/\1/' | head -n 1
     return
   fi
 }
@@ -47,16 +59,24 @@ start_dev() {
     pid="$(pid_on_port || true)"
 
     if wait_for_ready; then
-      echo "포트 3000(pid=${pid:-?})에서 이미 서버가 응답 중입니다. 브라우저만 엽니다."
+      echo "포트 ${PORT}(pid=${pid:-?})에서 이미 서버가 응답 중입니다. 브라우저만 엽니다."
       return 0
     fi
 
     if [ -n "$pid" ]; then
-      echo "포트 3000 프로세스(pid=$pid)가 응답하지 않습니다. 종료 후 재시작합니다."
-      kill "$pid" 2>/dev/null || true
-      sleep 1
+      local cmdline
+      cmdline="$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)"
+
+      if [[ "$cmdline" == *"$ROOT_DIR"* ]] || [[ "$cmdline" == *"next"* ]]; then
+        echo "포트 ${PORT} 프로세스(pid=$pid)가 응답하지 않습니다. 종료 후 재시작합니다."
+        kill "$pid" 2>/dev/null || true
+        sleep 1
+      else
+        echo "포트 ${PORT}는 다른 프로세스(pid=$pid, cmd: ${cmdline:-unknown})가 사용 중입니다. 강제 종료하지 않고 브라우저만 시도합니다."
+        return 0
+      fi
     else
-      echo "포트 3000이 점유 중인데 PID를 찾지 못했습니다. 재시작을 시도합니다."
+      echo "포트 ${PORT}가 점유 중인데 PID를 찾지 못했습니다. 재시작을 시도합니다."
     fi
   fi
 
