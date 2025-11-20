@@ -212,6 +212,11 @@ export default async function HomePage({ searchParams }: PageProps) {
               {p.region ? <span>지역: {p.region} · </span> : null}
               {p.category ? <span>분야: {p.category}</span> : null}
             </div>
+            {(p.source === 'bizinfo' || p.source === 'k-startup') ? (
+              <div style={{ color: '#d00', fontSize: 13, marginTop: 4 }}>
+                조회수 {typeof p.viewCount === 'number' ? p.viewCount : 'null'}
+              </div>
+            ) : null}
             <p style={{ marginTop: 8 }}>{p.summary ?? summarize(p.description) ?? '요약 없음'}</p>
             <div style={{ fontSize: 13, color: '#888' }}>
               {p.startDate ? <span>시작: {new Date(p.startDate).toLocaleDateString()} · </span> : null}
