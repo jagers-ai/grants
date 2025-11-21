@@ -17,6 +17,36 @@ if [[ -z "$PORT" && "$URL" =~ :([0-9]+) ]]; then
 fi
 PORT="${PORT:-3000}"
 
+detect_dev_port_from_log() {
+  if [ ! -f "$LOG_FILE" ]; then
+    return 1
+  fi
+
+  # 1순위: Network: http://0.0.0.0:PORT
+  local line
+  line="$(grep -E 'Network:\s+http://0\.0\.0\.0:[0-9]+' "$LOG_FILE" | tail -n 1 || true)"
+  if [ -n "$line" ]; then
+    echo "$line" | sed -E 's/.*0\.0\.0\.0:([0-9]+).*/\1/'
+    return 0
+  fi
+
+  # 2순위: Local: http://localhost:PORT
+  line="$(grep -E 'Local:\s+http://localhost:[0-9]+' "$LOG_FILE" | tail -n 1 || true)"
+  if [ -n "$line" ]; then
+    echo "$line" | sed -E 's/.*localhost:([0-9]+).*/\1/'
+    return 0
+  fi
+
+  # 3순위: Port 3000 is in use, trying PORT instead
+  line="$(grep -E 'Port 3000 is in use, trying [0-9]+' "$LOG_FILE" | tail -n 1 || true)"
+  if [ -n "$line" ]; then
+    echo "$line" | sed -E 's/.*trying ([0-9]+).*/\1/'
+    return 0
+  fi
+
+  return 1
+}
+
 port_in_use() {
   if command -v ss >/dev/null 2>&1; then
     ss -tln | awk '{print $4}' | grep -q ":${PORT}\$"
@@ -88,7 +118,20 @@ start_dev() {
   if wait_for_ready; then
     echo "grants dev 서버를 시작했습니다. 로그: $LOG_FILE"
   else
-    echo "dev 서버 응답을 확인하지 못했습니다. 로그를 확인하세요: $LOG_FILE"
+    # 3000이 막혀서 Next.js가 다른 포트로 뜬 경우 로그에서 실제 포트 추론
+    local detected
+    detected="$(detect_dev_port_from_log || true)"
+    if [ -n "$detected" ] && [ "$detected" != "$PORT" ]; then
+      PORT="$detected"
+      URL="${GRANTS_DEV_URL:-http://localhost:$PORT}"
+      if wait_for_ready; then
+        echo "grants dev 서버가 포트 ${PORT}에서 응답 중입니다. 로그: $LOG_FILE"
+      else
+        echo "dev 서버 응답을 확인하지 못했습니다. 로그를 확인하세요: $LOG_FILE"
+      fi
+    else
+      echo "dev 서버 응답을 확인하지 못했습니다. 로그를 확인하세요: $LOG_FILE"
+    fi
   fi
 }
 

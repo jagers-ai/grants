@@ -41,11 +41,25 @@ export default async function HomePage({ searchParams }: PageProps) {
     where.source = { in: sources }
   }
 
-  const programs = await prisma.program.findMany({
+  const rawPrograms = await prisma.program.findMany({
     where,
-    orderBy: [{ endDate: 'asc' }, { createdAt: 'desc' }],
-    take: 50,
   })
+
+  const programs = rawPrograms
+    .sort((a, b) => {
+      const aViews = a.viewCount ?? 0
+      const bViews = b.viewCount ?? 0
+      if (bViews !== aViews) return bViews - aViews
+
+      const aEnd = a.endDate ? new Date(a.endDate).getTime() : Number.POSITIVE_INFINITY
+      const bEnd = b.endDate ? new Date(b.endDate).getTime() : Number.POSITIVE_INFINITY
+      if (aEnd !== bEnd) return aEnd - bEnd
+
+      const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0
+      const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0
+      return bCreated - aCreated
+    })
+    .slice(0, 50)
 
   // 필터 통계 (UI 표시용)
   const totalCount = await prisma.program.count({ where })
@@ -212,6 +226,11 @@ export default async function HomePage({ searchParams }: PageProps) {
               {p.region ? <span>지역: {p.region} · </span> : null}
               {p.category ? <span>분야: {p.category}</span> : null}
             </div>
+            {(p.source === 'bizinfo' || p.source === 'k-startup') ? (
+              <div style={{ color: '#d00', fontSize: 13, marginTop: 4 }}>
+                조회수 {typeof p.viewCount === 'number' ? p.viewCount : 'null'}
+              </div>
+            ) : null}
             <p style={{ marginTop: 8 }}>{p.summary ?? summarize(p.description) ?? '요약 없음'}</p>
             <div style={{ fontSize: 13, color: '#888' }}>
               {p.startDate ? <span>시작: {new Date(p.startDate).toLocaleDateString()} · </span> : null}
