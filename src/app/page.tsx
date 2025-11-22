@@ -43,7 +43,12 @@ export default async function HomePage({ searchParams }: PageProps) {
 
   const programs = await prisma.program.findMany({
     where,
-    orderBy: [{ endDate: 'asc' }, { createdAt: 'desc' }],
+    orderBy: [
+      // 조회수 내림차순, 없는 값(null)은 최하단으로 보장
+      { viewCount: { sort: 'desc', nulls: 'last' } as any },
+      { endDate: 'asc' },
+      { createdAt: 'desc' },
+    ],
     take: 50,
   })
 
@@ -212,6 +217,11 @@ export default async function HomePage({ searchParams }: PageProps) {
               {p.region ? <span>지역: {p.region} · </span> : null}
               {p.category ? <span>분야: {p.category}</span> : null}
             </div>
+            {p.source === 'bizinfo' ? (
+              <div style={{ color: '#d00', fontSize: 13, marginTop: 4 }}>
+                조회수 {typeof p.viewCount === 'number' ? p.viewCount : 'null'}
+              </div>
+            ) : null}
             <p style={{ marginTop: 8 }}>{p.summary ?? summarize(p.description) ?? '요약 없음'}</p>
             <div style={{ fontSize: 13, color: '#888' }}>
               {p.startDate ? <span>시작: {new Date(p.startDate).toLocaleDateString()} · </span> : null}
